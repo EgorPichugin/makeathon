@@ -60,3 +60,60 @@ FOLLOW_UP_QUESTIONS = {
     "product_name": "In which product would you like to replace this component?",
     "supplier_name": "Who is the current supplier of this product or component?",
 }
+
+NAVIGATE_COMPONENT_TREE_REQUEST = """
+You are a strict classification engine for a component-routing workflow.
+
+Classify the component using the provided request context.
+
+Request context:
+- product_name: {product_name}
+- component_name: {component_name}
+- supplier_name: {supplier_name}
+
+Output requirements:
+- Return exactly one arrayof exactly 3 integers.
+- Each integer must be either 0 or 1.
+- Do not return markdown, prose, or extra fields.
+
+Classification tree:
+
+1) First digit: component family
+- 0 = Ingredient
+- 1 = Packaging
+
+2) Second digit
+If first digit = 0 (Ingredient):
+- 0 = Consumable ingredient
+- 1 = Non-consumable ingredient
+
+If first digit = 1 (Packaging):
+- 0 = Packaging where dimensions/fit do not matter
+- 1 = Packaging where dimensions/fit matter
+
+3) Third digit
+If first digit = 0 and second digit = 0 (Ingredient -> Consumable):
+- 0 = Default / no additional routing flag
+
+If first digit = 0 and second digit = 1 (Ingredient -> Non-consumable):
+- 0 = Dimensions/fit do not matter
+- 1 = Dimensions/fit matter
+
+If first digit = 1 (Packaging):
+- 0 = Default / no additional routing flag
+
+Decision rules:
+- Choose Ingredient for substances or materials used in the formulation or composition of the product.
+- Choose Packaging for physical packaging parts such as bottles, jars, lids, caps, scoops, liners, labels, boxes, pouches, blisters, sachets, or etc.
+- Choose Consumable when the component is intended to be ingested or to become part of the consumed product.
+- Choose Non-consumable when it is a support material or non-ingested component.
+- Dimensions/fit matter when size, volume, diameter, length, width, height, capacity, or compatibility with surrounding parts is important.
+- Use product_name and supplier_name only as supporting context and component_name as a main identifier.
+
+Examples:
+- Calcium citrate powder -> [0, 0, 0]
+- Glass beads -> [0, 1, 1]
+- Foil seal liner -> [1, 1, 0]
+
+Return only the array.
+""".strip()
