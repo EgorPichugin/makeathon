@@ -1,6 +1,3 @@
-import sqlite3
-from pathlib import Path
-
 from services.assistant.llm import get_structured_llm
 from services.assistant.models import (
     ChangeComponentUpdateResult,
@@ -12,9 +9,7 @@ from services.assistant.prompts import (
     INTENT_ROUTER_PROMPT,
 )
 from services.assistant.state import AppState, Intent
-
-
-CPG_DB_PATH = Path(r"C:\Users\pichu\Documents\repos\hackaton\db.sqlite")
+from services.assistant.validation import validate_change_request_data
 
 
 def detect_intent(state: AppState) -> Intent:
@@ -85,97 +80,8 @@ def find_missing_fields(data: dict) -> list[str]:
 
 
 def validate_change_request(state: AppState) -> dict:
-    validation_errors: list[str] = []
-    invalid_fields: list[str] = []
-
-    with sqlite3.connect(CPG_DB_PATH) as connection:
-        product_id = _get_product_id_by_sku(connection, state["product_name"])
-        component_id = _get_product_id_by_sku(connection, state["component_name"])
-        supplier_id = _get_supplier_id_by_name(connection, state["supplier_name"])
-
-        if product_id is None:
-            invalid_fields.append("product_name")
-            validation_errors.append(
-                f"Product '{state['product_name']}' was not found in Product.SKU."
-            )
-        if component_id is None:
-            invalid_fields.append("component_name")
-            validation_errors.append(
-                f"Component '{state['component_name']}' was not found in Product.SKU."
-            )
-        if supplier_id is None:
-            invalid_fields.append("supplier_name")
-            validation_errors.append(
-                f"Supplier '{state['supplier_name']}' was not found in Supplier.Name."
-            )
-        if validation_errors:
-            return {
-                "validation_errors": validation_errors,
-                "invalid_fields": invalid_fields,
-            }
-
-        if not _component_belongs_to_product(connection, product_id, component_id):
-            invalid_fields.append("component_name")
-            validation_errors.append(
-                f"Component '{state['component_name']}' is not a BOM component of product '{state['product_name']}'."
-            )
-        if not _supplier_supplies_product(connection, supplier_id, component_id):
-            invalid_fields.append("supplier_name")
-            validation_errors.append(
-                f"Supplier '{state['supplier_name']}' does not supply raw material '{state['component_name']}'."
-            )
-        if _supplier_supplies_product(connection, supplier_id, product_id):
-            invalid_fields.append("supplier_name")
-            validation_errors.append(
-                f"Supplier '{state['supplier_name']}' already supplies finished good '{state['product_name']}', which is not allowed by this rule."
-            )
-
-    return {
-        "validation_errors": validation_errors,
-        "invalid_fields": list(dict.fromkeys(invalid_fields)),
-    }
-
-
-def _get_product_id_by_sku(connection: sqlite3.Connection, sku: str) -> int | None:
-    row = connection.execute(
-        "SELECT Id FROM Product WHERE LOWER(SKU) = LOWER(?) LIMIT 1",
-        (sku.strip(),),
-    ).fetchone()
-    return row[0] if row else None
-
-
-def _get_supplier_id_by_name(connection: sqlite3.Connection, supplier_name: str) -> int | None:
-    row = connection.execute(
-        "SELECT Id FROM Supplier WHERE LOWER(Name) = LOWER(?) LIMIT 1",
-        (supplier_name.strip(),),
-    ).fetchone()
-    return row[0] if row else None
-
-
-def _component_belongs_to_product(connection: sqlite3.Connection, product_id: int, component_id: int) -> bool:
-    row = connection.execute(
-        """
-        SELECT 1
-        FROM BOM b
-        JOIN BOM_Component bc ON bc.BOMId = b.Id
-        WHERE b.ProducedProductId = ?
-        AND bc.ConsumedProductId = ?
-        LIMIT 1
-        """,
-        (product_id, component_id),
-    ).fetchone()
-    return row is not None
-
-
-def _supplier_supplies_product(connection: sqlite3.Connection, supplier_id: int, product_id: int) -> bool:
-    row = connection.execute(
-        """
-        SELECT 1
-        FROM Supplier_Product
-        WHERE SupplierId = ?
-        AND ProductId = ?
-        LIMIT 1
-        """,
-        (supplier_id, product_id),
-    ).fetchone()
-    return row is not None
+    return validate_change_request_data(
+        product_name=state["product_name"],
+        component_name=state["component_name"],
+        supplier_name=state["supplier_name"],
+    )
