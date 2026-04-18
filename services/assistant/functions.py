@@ -157,7 +157,7 @@ def get_route_vector(state: AppState) -> list[int]:
         get_structured_llm(NavigationComponentTreeResult),
         component_structure_prompt,
     )
-    state["route_vector"] = result.route_vector
+
     return result.route_vector
 
 def get_route_vector_for_product(supplier_name: str, component_name: str) -> list[int]:
@@ -187,7 +187,7 @@ def get_product_structure(route_vector: list[int]) -> dict | None:
         return DimensionalPackagingMetadata().model_dump()
     return None
 
-def filter_products_by_route_vector(products: dict[str, list[str]], route_vector: list[int]) -> dict[str, list[str]]:
+def get_filtered_products_by_route_vector(products: dict[str, list[str]], route_vector: list[int]) -> dict[str, list[str]]:
     filtered = {}
     for supplier, product_names in products.items():
         for product in product_names:

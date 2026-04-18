@@ -3,7 +3,7 @@ import json
 from services.assistant.functions import (
     detect_intent,
     extract_change_component_update,
-    filter_products_by_route_vector,
+    get_filtered_products_by_route_vector,
     get_supplier_components_for_product,
     get_route_vector,
     get_product_structure,
@@ -78,7 +78,7 @@ def validator_node(state: AppState) -> dict:
 def suppliers_search_node(state: AppState) -> dict[str, list[str]]:
     supplier_components: dict[str, list[str]] = get_supplier_components_for_product(state["product_name"])
     
-    filtered_supplier_components = filter_products_by_route_vector(supplier_components, state["route_vector"])
+    filtered_supplier_components = get_filtered_products_by_route_vector(supplier_components, state["route_vector"])
     return {
         "final_answer": json.dumps(filtered_supplier_components, indent=2)
     }
@@ -97,4 +97,6 @@ def side_question_node(state: AppState) -> dict:
 
 def create_component_structure_node(state: AppState) -> dict | None:
     route = get_route_vector(state)
-    return get_product_structure(route)
+    # return get_product_structure(route)
+
+    return {"route_vector": route}
