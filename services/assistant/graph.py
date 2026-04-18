@@ -33,10 +33,10 @@ def build_orchestrator_graph():
 
     # Validate the change component request against the database and provide a final answer
     graph.add_node("validator", logged_node("validator", validator_node))
-    #endregion
 
     # Nodes for createng a BaseModel Shema for the given component
     graph.add_node("create_component_structure", logged_node("create_component_structure", create_component_structure_node))
+    #endregion
 
     graph.add_edge(START, "orchestrator")
     graph.add_conditional_edges(

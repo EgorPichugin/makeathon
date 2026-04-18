@@ -40,7 +40,7 @@ NonConsumableIngredientMetadata = create_model(
 
 DimensionalNonConsumableIngredientMetadata = create_model(
     "DimensionalNonConsumableIngredientMetadata",
-    dimension = Dimensions | None = None,
+    dimension = Dimensions | None,
     __base__=IngredientMetadata
 )
 
@@ -57,8 +57,8 @@ PackagingMetadata = create_model(
 
 DimensionalPackagingMetadata = create_model(
     "DimensionalPackagingMetadata",
-    dimension = Dimensions | None = None,
-    volume = Volume | None = None,
+    dimension = Dimensions | None,
+    volume = Volume | None,
     __base__=PackagingMetadata
 )
 
