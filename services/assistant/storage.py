@@ -1,17 +1,11 @@
 import json
-import sqlite3
-from pathlib import Path
 
 from services.assistant.state import AppState, Intent
+from services.db import get_connection
 
 
-DEFAULT_DB_PATH = Path("data") / "assistant.db"
-
-
-def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
-    path = Path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(path) as connection:
+def init_db() -> None:
+    with get_connection() as connection:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS assistant_threads (
@@ -29,17 +23,13 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         connection.commit()
 
 
-def load_thread_state(thread_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> AppState:
-    path = Path(db_path)
-    if not path.exists():
-        return {}
-
-    with sqlite3.connect(path) as connection:
+def load_thread_state(thread_id: str) -> AppState:
+    with get_connection() as connection:
         row = connection.execute(
             """
             SELECT intent, component_name, product_name, supplier_name, missing_fields, final_answer
             FROM assistant_threads
-            WHERE thread_id = ?
+            WHERE thread_id = %s
             """,
             (thread_id,),
         ).fetchone()
@@ -58,11 +48,9 @@ def load_thread_state(thread_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> 
     }
 
 
-def save_thread_state(thread_id: str, state: AppState, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+def save_thread_state(thread_id: str, state: AppState) -> None:
     state_to_save = _state_for_persistence(state)
-    path = Path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(path) as connection:
+    with get_connection() as connection:
         connection.execute(
             """
             INSERT INTO assistant_threads (
@@ -75,14 +63,14 @@ def save_thread_state(thread_id: str, state: AppState, db_path: str | Path = DEF
                 final_answer,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT(thread_id) DO UPDATE SET
-                intent = excluded.intent,
-                component_name = excluded.component_name,
-                product_name = excluded.product_name,
-                supplier_name = excluded.supplier_name,
-                missing_fields = excluded.missing_fields,
-                final_answer = excluded.final_answer,
+                intent = EXCLUDED.intent,
+                component_name = EXCLUDED.component_name,
+                product_name = EXCLUDED.product_name,
+                supplier_name = EXCLUDED.supplier_name,
+                missing_fields = EXCLUDED.missing_fields,
+                final_answer = EXCLUDED.final_answer,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (

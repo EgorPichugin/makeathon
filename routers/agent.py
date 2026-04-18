@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 
-from core.config import ASSISTANT_DB_PATH
 from schemas.agent import AgentRequest, AgentResponse
 from services.assistant.graph import orchestrator_graph
 from services.assistant.observability import invoke_with_logging
@@ -11,11 +10,11 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 @router.post("/request", response_model=AgentResponse)
 def handle_agent_request(payload: AgentRequest) -> AgentResponse:
-    state = load_thread_state(payload.thread_id, ASSISTANT_DB_PATH)
+    state = load_thread_state(payload.thread_id)
     result = invoke_with_logging(
         "orchestrator_graph",
         orchestrator_graph,
         {**state, "user_message": payload.message},
     )
-    save_thread_state(payload.thread_id, result, ASSISTANT_DB_PATH)
+    save_thread_state(payload.thread_id, result)
     return AgentResponse(answer=result["final_answer"])

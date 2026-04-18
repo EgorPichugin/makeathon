@@ -1,19 +1,14 @@
-import sqlite3
-from pathlib import Path
-
-from core.config import CPG_DB_PATH
 from fastapi import APIRouter
 from pydantic import BaseModel
 from services.assistant.validation import validate_change_request_data
+from services.db import get_connection
 
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
-CPG_DB_FILE = Path(CPG_DB_PATH)
-
 @router.get("", response_model=list[str])
 def list_companies() -> list[str]:
-    with sqlite3.connect(CPG_DB_FILE) as connection:
+    with get_connection() as connection:
         rows = connection.execute(
             """
             SELECT Name
@@ -59,7 +54,6 @@ def validate_request(payload: ValidationRequest) -> ValidationResponse:
         product_name=payload.product_name,
         component_name=payload.component_name,
         supplier_name=payload.supplier_name,
-        db_path=CPG_DB_FILE,
     )
     return ValidationResponse(
         is_valid=not result["validation_errors"],
@@ -69,13 +63,13 @@ def validate_request(payload: ValidationRequest) -> ValidationResponse:
 
 @router.get("/product/{product_id}/suppliers", response_model=SupplierListResponse)
 def list_product_suppliers(product_id: int) -> SupplierListResponse:
-    with sqlite3.connect(CPG_DB_FILE) as connection:
+    with get_connection() as connection:
         rows = connection.execute(
             """
             SELECT s.Name
             FROM Supplier_Product sp
             JOIN Supplier s ON s.Id = sp.SupplierId
-            WHERE sp.ProductId = ?
+            WHERE sp.ProductId = %s
             AND s.Name IS NOT NULL
             AND TRIM(s.Name) != ''
             ORDER BY s.Name
