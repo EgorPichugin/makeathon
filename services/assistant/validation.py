@@ -1,13 +1,14 @@
 import sqlite3
 from pathlib import Path
-from core.config import ASSISTANT_DB_PATH
+
+from core.config import CPG_DB_PATH as DEFAULT_CPG_DB_PATH
 
 
 def validate_change_request_data(
     product_name: str,
     component_name: str,
     supplier_name: str,
-    db_path: str | Path = ASSISTANT_DB_PATH,
+    db_path: str | Path = DEFAULT_CPG_DB_PATH,
 ) -> dict:
     validation_errors: list[str] = []
     invalid_fields: list[str] = []
