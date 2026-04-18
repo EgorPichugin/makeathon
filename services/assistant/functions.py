@@ -86,6 +86,7 @@ def find_missing_fields(data: dict) -> list[str]:
 
 def validate_change_request(state: AppState) -> dict:
     validation_errors: list[str] = []
+    invalid_fields: list[str] = []
 
     with sqlite3.connect(CPG_DB_PATH) as connection:
         product_id = _get_product_id_by_sku(connection, state["product_name"])
@@ -93,39 +94,46 @@ def validate_change_request(state: AppState) -> dict:
         supplier_id = _get_supplier_id_by_name(connection, state["supplier_name"])
 
         if product_id is None:
+            invalid_fields.append("product_name")
             validation_errors.append(
                 f"Product '{state['product_name']}' was not found in Product.SKU."
             )
         if component_id is None:
+            invalid_fields.append("component_name")
             validation_errors.append(
                 f"Component '{state['component_name']}' was not found in Product.SKU."
             )
         if supplier_id is None:
+            invalid_fields.append("supplier_name")
             validation_errors.append(
                 f"Supplier '{state['supplier_name']}' was not found in Supplier.Name."
             )
         if validation_errors:
-            return {"validation_errors": validation_errors}
+            return {
+                "validation_errors": validation_errors,
+                "invalid_fields": invalid_fields,
+            }
 
         if not _component_belongs_to_product(connection, product_id, component_id):
+            invalid_fields.append("component_name")
             validation_errors.append(
                 f"Component '{state['component_name']}' is not a BOM component of product '{state['product_name']}'."
             )
         if not _supplier_supplies_product(connection, supplier_id, component_id):
+            invalid_fields.append("supplier_name")
             validation_errors.append(
                 f"Supplier '{state['supplier_name']}' does not supply raw material '{state['component_name']}'."
             )
         if _supplier_supplies_product(connection, supplier_id, product_id):
+            invalid_fields.append("supplier_name")
             validation_errors.append(
                 f"Supplier '{state['supplier_name']}' already supplies finished good '{state['product_name']}', which is not allowed by this rule."
             )
 
-    return {"validation_errors": validation_errors}
-
-
-def _value_exists(connection: sqlite3.Connection, query: str, value: str) -> bool:
-    row = connection.execute(query, (value.strip(),)).fetchone()
-    return row is not None
+    return {
+        "validation_errors": validation_errors,
+        "invalid_fields": list(dict.fromkeys(invalid_fields)),
+    }
 
 
 def _get_product_id_by_sku(connection: sqlite3.Connection, sku: str) -> int | None:

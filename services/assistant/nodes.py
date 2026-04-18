@@ -42,13 +42,31 @@ def validator_node(state: AppState) -> dict:
     validation_errors = validation_result["validation_errors"]
 
     if validation_errors:
+        invalid_fields = validation_result["invalid_fields"]
+        corrected_state = {
+            "component_name": state.get("component_name"),
+            "product_name": state.get("product_name"),
+            "supplier_name": state.get("supplier_name"),
+        }
+        for field_name in invalid_fields:
+            corrected_state[field_name] = None
+
+        next_missing_field = invalid_fields[0]
         return {
+            **corrected_state,
+            "missing_fields": invalid_fields,
             "validation_errors": validation_errors,
-            "final_answer": "Please correct the request details:\n- " + "\n- ".join(validation_errors),
+            "final_answer": (
+                "Please correct the request details:\n- "
+                + "\n- ".join(validation_errors)
+                + "\n\n"
+                + FOLLOW_UP_QUESTIONS[next_missing_field]
+            ),
         }
 
     return {
         "validation_errors": [],
+        "missing_fields": [],
         "final_answer": (
             f"{CHANGE_COMPONENT_RESPONSE} "
             f"I verified that product '{state['product_name']}', component '{state['component_name']}', "
