@@ -13,6 +13,7 @@ class AppState(TypedDict, total=False):
     component_name: str | None
     product_name: str | None
     supplier_name: str | None
+    route_vector: list[int] | None
     missing_fields: list[str]
     validation_errors: list[str]
     final_answer: str

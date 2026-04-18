@@ -108,6 +108,21 @@ def get_route_vector(state: AppState) -> list[int]:
         get_structured_llm(NavigationComponentTreeResult),
         component_structure_prompt,
     )
+    state["route_vector"] = result.route_vector
+    return result.route_vector
+
+def get_route_vector_for_product(supplier_name: str, component_name: str) -> list[int]:
+    component_structure_prompt = NAVIGATE_COMPONENT_TREE_REQUEST.format(
+        product_name="",
+        component_name=component_name,
+        supplier_name=supplier_name,
+    )
+
+    result: NavigationComponentTreeResult = invoke_with_logging(
+        "navigate_component_tree_llm",
+        get_structured_llm(NavigationComponentTreeResult),
+        component_structure_prompt,
+    )
     return result.route_vector
 
 def get_product_structure(route_vector: list[int]) -> str | None:
@@ -122,3 +137,14 @@ def get_product_structure(route_vector: list[int]) -> str | None:
     elif route_vector == [1, 1, 0]:
         return DimensionalPackagingMetadata().model_dump_json(exclude={"route_vector"})
     return None
+
+def filter_products_by_route_vector(products: dict[str, list[str]], route_vector: list[int]) -> dict[str, list[str]]:
+    filtered = {}
+    for supplier, product_names in products.items():
+        for product in product_names:
+            product_vector = get_route_vector_for_product(supplier, product)
+            if product_vector == route_vector: 
+                if supplier not in filtered:
+                    filtered[supplier] = []
+                filtered[supplier].append(product)
+    return filtered
