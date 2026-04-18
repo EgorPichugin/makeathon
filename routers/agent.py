@@ -10,6 +10,16 @@ from services.assistant.storage import load_thread_state, save_thread_state
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
+@router.post("/request", response_model=AgentResponse)
+def handle_agent_request(payload: AgentRequest) -> AgentResponse:
+    state = load_thread_state(payload.thread_id)
+    result = invoke_with_logging(
+        "orchestrator_graph",
+        orchestrator_graph,
+        {**state, "user_message": payload.message},
+    )
+    save_thread_state(payload.thread_id, result)
+    return AgentResponse(answer=result["final_answer"])
 
 @router.post("/route-vector", response_model=RouteVectorResponse)
 def route_vector_test(payload: RouteVectorRequest) -> RouteVectorResponse:
