@@ -2,15 +2,25 @@ from services.assistant.llm import get_structured_llm
 from services.assistant.models import (
     ChangeComponentUpdateResult,
     ConversationIntentResult,
+    NavigationComponentTreeResult,
 )
 from services.assistant.observability import invoke_with_logging
 from services.assistant.prompts import (
     CHANGE_COMPONENT_UPDATE_PROMPT,
     INTENT_ROUTER_PROMPT,
+    NAVIGATE_COMPONENT_TREE_REQUEST,
 )
 from services.assistant.state import AppState, Intent
 from services.assistant.validation import validate_change_request_data
 from services.db import get_connection
+
+from schemas.component import (
+    ConsumableIngredientMetadata,
+    DimensionalNonConsumableIngredientMetadata,
+    DimensionalPackagingMetadata,
+    NonConsumableIngredientMetadata,
+    NonDimensionalPackagingMetadata,
+)
 
 
 def detect_intent(state: AppState) -> Intent:
@@ -134,3 +144,56 @@ def get_supplier_components_for_product(product_name: str) -> dict[str, list[str
             supplier_components[supplier_name].append(component_sku)
 
     return supplier_components
+
+def get_route_vector(state: AppState) -> list[int]:
+    component_structure_prompt = NAVIGATE_COMPONENT_TREE_REQUEST.format(
+        product_name=state.get("product_name", ""),
+        component_name=state.get("component_name", ""),
+        supplier_name=state.get("supplier_name", ""),
+    )
+
+    result: NavigationComponentTreeResult = invoke_with_logging(
+        "navigate_component_tree_llm",
+        get_structured_llm(NavigationComponentTreeResult),
+        component_structure_prompt,
+    )
+    state["route_vector"] = result.route_vector
+    return result.route_vector
+
+def get_route_vector_for_product(supplier_name: str, component_name: str) -> list[int]:
+    component_structure_prompt = NAVIGATE_COMPONENT_TREE_REQUEST.format(
+        product_name="",
+        component_name=component_name,
+        supplier_name=supplier_name,
+    )
+
+    result: NavigationComponentTreeResult = invoke_with_logging(
+        "navigate_component_tree_llm",
+        get_structured_llm(NavigationComponentTreeResult),
+        component_structure_prompt,
+    )
+    return result.route_vector
+
+def get_product_structure(route_vector: list[int]) -> dict | None:
+    if route_vector == [0, 0, 0]:
+        return ConsumableIngredientMetadata().model_dump()
+    elif route_vector == [0, 1, 0]:
+        return NonConsumableIngredientMetadata().model_dump()
+    elif route_vector == [0, 1, 1]:
+        return DimensionalNonConsumableIngredientMetadata().model_dump()
+    elif route_vector == [1, 0, 0]:
+        return NonDimensionalPackagingMetadata().model_dump()
+    elif route_vector == [1, 1, 0]:
+        return DimensionalPackagingMetadata().model_dump()
+    return None
+
+def filter_products_by_route_vector(products: dict[str, list[str]], route_vector: list[int]) -> dict[str, list[str]]:
+    filtered = {}
+    for supplier, product_names in products.items():
+        for product in product_names:
+            product_vector = get_route_vector_for_product(supplier, product)
+            if product_vector == route_vector: 
+                if supplier not in filtered:
+                    filtered[supplier] = []
+                filtered[supplier].append(product)
+    return filtered

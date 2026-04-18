@@ -9,7 +9,9 @@ from services.assistant.nodes import (
     side_question_node,
     suppliers_search_node,
     validator_node,
+    create_component_structure_node,
 )
+
 from services.assistant.observability import logged_node
 from services.assistant.state import AppState
 
@@ -34,8 +36,12 @@ def build_orchestrator_graph():
     # Validate the change component request against the database and provide a final answer
     graph.add_node("validator", logged_node("validator", validator_node))
 
+    # Nodes for createng a BaseModel Shema for the given component
+    graph.add_node("create_component_structure", logged_node("create_component_structure", create_component_structure_node))
+
     # Search for similar components in a list of product suppliers
     graph.add_node("suppliers_search", logged_node("suppliers_search", suppliers_search_node))
+
     #endregion
 
     graph.add_edge(START, "orchestrator")
@@ -55,12 +61,19 @@ def build_orchestrator_graph():
             "validator": "validator",
         },
     )
+
     graph.add_edge("ask_for_missing", END)
     graph.add_edge("side_question", END)
-    graph.add_edge("validator", "suppliers_search")
+    graph.add_edge("validator", "create_component_structure")
+    graph.add_edge("create_component_structure", "suppliers_search")
     graph.add_edge("suppliers_search", END)
 
     return graph.compile()
 
+def save_orchestrator_graph(graph):
+    png_bytes = graph.get_graph().draw_mermaid_png()
+    with open("langgraph_structure.png", "wb") as f:
+        f.write(png_bytes)
 
 orchestrator_graph = build_orchestrator_graph()
+save_orchestrator_graph(orchestrator_graph)
