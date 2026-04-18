@@ -125,17 +125,17 @@ def get_route_vector_for_product(supplier_name: str, component_name: str) -> lis
     )
     return result.route_vector
 
-def get_product_structure(route_vector: list[int]) -> str | None:
+def get_product_structure(route_vector: list[int]) -> dict | None:
     if route_vector == [0, 0, 0]:
-        return ConsumableIngredientMetadata().model_dump_json(exclude={"route_vector"})
+        return ConsumableIngredientMetadata().model_dump()
     elif route_vector == [0, 1, 0]:
-        return NonConsumableIngredientMetadata().model_dump_json(exclude={"route_vector"})
+        return NonConsumableIngredientMetadata().model_dump()
     elif route_vector == [0, 1, 1]:
-        return DimensionalNonConsumableIngredientMetadata().model_dump_json(exclude={"route_vector"})
+        return DimensionalNonConsumableIngredientMetadata().model_dump()
     elif route_vector == [1, 0, 0]:
-        return NonDimensionalPackagingMetadata().model_dump_json(exclude={"route_vector"})
+        return NonDimensionalPackagingMetadata().model_dump()
     elif route_vector == [1, 1, 0]:
-        return DimensionalPackagingMetadata().model_dump_json(exclude={"route_vector"})
+        return DimensionalPackagingMetadata().model_dump()
     return None
 
 def filter_products_by_route_vector(products: dict[str, list[str]], route_vector: list[int]) -> dict[str, list[str]]:

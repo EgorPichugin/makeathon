@@ -88,6 +88,6 @@ def ask_for_missing_node(state: AppState) -> dict:
 def side_question_node(state: AppState) -> dict:
     return {"final_answer": SIDE_QUESTION_RESPONSE}
 
-def create_component_structure_node(state: AppState) -> str | None:
+def create_component_structure_node(state: AppState) -> dict | None:
     route = get_route_vector(state)
     return get_product_structure(route)
