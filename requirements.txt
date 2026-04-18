@@ -2,4 +2,5 @@ fastapi
 langchain
 langchain-openai
 langgraph
+psycopg[binary]
 uvicorn[standard]

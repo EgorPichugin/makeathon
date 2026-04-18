@@ -21,9 +21,7 @@ from services.assistant.prompts import (
     NAVIGATE_COMPONENT_TREE_REQUEST,
 )
 from services.assistant.state import AppState, Intent
-
-
-CPG_DB_PATH = Path(r"C:\Users\pichu\Documents\repos\hackaton\db.sqlite")
+from services.assistant.validation import validate_change_request_data
 
 
 def detect_intent(state: AppState) -> Intent:

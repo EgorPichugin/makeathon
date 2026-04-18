@@ -1,19 +1,15 @@
-import sqlite3
-from pathlib import Path
-
-from core.config import CPG_DB_PATH as DEFAULT_CPG_DB_PATH
+from services.db import get_connection
 
 
 def validate_change_request_data(
     product_name: str,
     component_name: str,
     supplier_name: str,
-    db_path: str | Path = DEFAULT_CPG_DB_PATH,
 ) -> dict:
     validation_errors: list[str] = []
     invalid_fields: list[str] = []
 
-    with sqlite3.connect(db_path) as connection:
+    with get_connection() as connection:
         product_id = _get_product_id_by_sku(connection, product_name)
         component_id = _get_product_id_by_sku(connection, component_name)
         supplier_id = _get_supplier_id_by_name(connection, supplier_name)
@@ -61,30 +57,30 @@ def validate_change_request_data(
     }
 
 
-def _get_product_id_by_sku(connection: sqlite3.Connection, sku: str) -> int | None:
+def _get_product_id_by_sku(connection, sku: str) -> int | None:
     row = connection.execute(
-        "SELECT Id FROM Product WHERE LOWER(SKU) = LOWER(?) LIMIT 1",
+        "SELECT Id FROM Product WHERE LOWER(SKU) = LOWER(%s) LIMIT 1",
         (sku.strip(),),
     ).fetchone()
     return row[0] if row else None
 
 
-def _get_supplier_id_by_name(connection: sqlite3.Connection, supplier_name: str) -> int | None:
+def _get_supplier_id_by_name(connection, supplier_name: str) -> int | None:
     row = connection.execute(
-        "SELECT Id FROM Supplier WHERE LOWER(Name) = LOWER(?) LIMIT 1",
+        "SELECT Id FROM Supplier WHERE LOWER(Name) = LOWER(%s) LIMIT 1",
         (supplier_name.strip(),),
     ).fetchone()
     return row[0] if row else None
 
 
-def _component_belongs_to_product(connection: sqlite3.Connection, product_id: int, component_id: int) -> bool:
+def _component_belongs_to_product(connection, product_id: int, component_id: int) -> bool:
     row = connection.execute(
         """
         SELECT 1
         FROM BOM b
         JOIN BOM_Component bc ON bc.BOMId = b.Id
-        WHERE b.ProducedProductId = ?
-        AND bc.ConsumedProductId = ?
+        WHERE b.ProducedProductId = %s
+        AND bc.ConsumedProductId = %s
         LIMIT 1
         """,
         (product_id, component_id),
@@ -92,13 +88,13 @@ def _component_belongs_to_product(connection: sqlite3.Connection, product_id: in
     return row is not None
 
 
-def _supplier_supplies_product(connection: sqlite3.Connection, supplier_id: int, product_id: int) -> bool:
+def _supplier_supplies_product(connection, supplier_id: int, product_id: int) -> bool:
     row = connection.execute(
         """
         SELECT 1
         FROM Supplier_Product
-        WHERE SupplierId = ?
-        AND ProductId = ?
+        WHERE SupplierId = %s
+        AND ProductId = %s
         LIMIT 1
         """,
         (supplier_id, product_id),
