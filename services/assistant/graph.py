@@ -7,6 +7,7 @@ from services.assistant.nodes import (
     route_after_change_component,
     route_after_orchestrator,
     side_question_node,
+    suppliers_search_node,
     validator_node,
     create_component_structure_node,
 )
@@ -37,6 +38,10 @@ def build_orchestrator_graph():
 
     # Nodes for createng a BaseModel Shema for the given component
     graph.add_node("create_component_structure", logged_node("create_component_structure", create_component_structure_node))
+
+    # Search for similar components in a list of product suppliers
+    graph.add_node("suppliers_search", logged_node("suppliers_search", suppliers_search_node))
+
     #endregion
 
     graph.add_edge(START, "orchestrator")
@@ -60,7 +65,8 @@ def build_orchestrator_graph():
     graph.add_edge("ask_for_missing", END)
     graph.add_edge("side_question", END)
     graph.add_edge("validator", "create_component_structure")
-    graph.add_edge("create_component_structure", END)
+    graph.add_edge("create_component_structure", "suppliers_search")
+    graph.add_edge("suppliers_search", END)
 
     return graph.compile()
 

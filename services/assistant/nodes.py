@@ -1,6 +1,10 @@
+import json
+
 from services.assistant.functions import (
     detect_intent,
     extract_change_component_update,
+    filter_products_by_route_vector,
+    get_supplier_components_for_product,
     get_route_vector,
     get_product_structure,
     validate_change_request,
@@ -68,12 +72,15 @@ def validator_node(state: AppState) -> dict:
 
     return {
         "validation_errors": [],
-        "missing_fields": [],
-        "final_answer": (
-            f"{CHANGE_COMPONENT_RESPONSE} "
-            f"I verified that product '{state['product_name']}', component '{state['component_name']}', "
-            f"and supplier '{state['supplier_name']}' exist in the database."
-        ),
+        "missing_fields": []
+    }
+
+def suppliers_search_node(state: AppState) -> dict[str, list[str]]:
+    supplier_components: dict[str, list[str]] = get_supplier_components_for_product(state["product_name"])
+    
+    filtered_supplier_components = filter_products_by_route_vector(supplier_components, state['route_vector'])
+    return {
+        "final_answer": json.dumps(filtered_supplier_components, indent=2)
     }
 
 
