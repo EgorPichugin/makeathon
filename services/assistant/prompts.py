@@ -67,8 +67,8 @@ You are a strict classification engine for a component-routing workflow.
 Classify the component using the provided request context.
 
 Request context:
-- component_name: {component_name}
 - product_name: {product_name}
+- component_name: {component_name}
 - supplier_name: {supplier_name}
 
 Output requirements:
@@ -104,11 +104,11 @@ If first digit = 1 (Packaging):
 
 Decision rules:
 - Choose Ingredient for substances or materials used in the formulation or composition of the product.
-- Choose Packaging for physical packaging parts such as bottles, jars, lids, caps, scoops, liners, labels, boxes, pouches, blisters, or sachets.
+- Choose Packaging for physical packaging parts such as bottles, jars, lids, caps, scoops, liners, labels, boxes, pouches, blisters, sachets, or etc.
 - Choose Consumable when the component is intended to be ingested or to become part of the consumed product.
 - Choose Non-consumable when it is a support material or non-ingested component.
 - Dimensions/fit matter when size, volume, diameter, length, width, height, capacity, or compatibility with surrounding parts is important.
-- Use product_name and supplier_name only as supporting context when component_name is ambiguous.
+- Use product_name and supplier_name only as supporting context and component_name as a main identifier.
 
 Examples:
 - Calcium citrate powder -> [0, 0, 0]
