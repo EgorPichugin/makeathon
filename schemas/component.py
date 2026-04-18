@@ -20,7 +20,7 @@ class Volume(BaseModel):
 
 IngredientMetadata = create_model(
     "IngredientMetadata",
-    physical_form = (Literal["powder", "liquid", "solid", "extract"], ...),
+    physical_form = (Literal["powder", "liquid", "solid", "extract"], None),
     __base__=Default)
 
 ConsumableIngredientMetadata = create_model(
@@ -28,19 +28,19 @@ ConsumableIngredientMetadata = create_model(
     functional_role= (Literal[
         "active", "nutrient", "flavor", "colorant",
         "sweetener", "preservative", "excipient"
-        ], ...),
+        ], None),
     __base__=IngredientMetadata
 )
 
 NonConsumableIngredientMetadata = create_model(
     "NonConsumableIngredientMetadata",
-    material_type = (Literal["plastic", "glass", "paper", "foil", "metal", "composite"], ...),
+    material_type = (Literal["plastic", "glass", "paper", "foil", "metal", "composite"], None),
     __base__=IngredientMetadata
 )
 
 DimensionalNonConsumableIngredientMetadata = create_model(
     "DimensionalNonConsumableIngredientMetadata",
-    dimension = Dimensions | None,
+    dimension = Dimensions | None = None,
     __base__=IngredientMetadata
 )
 
@@ -50,15 +50,15 @@ PackagingMetadata = create_model(
     package_type = (Literal[
         "bottle", "lid", "cap", "pouch", "label",
         "box", "blister", "sachet", "scoop"
-        ], ...),
-    material_type = (Literal["plastic", "glass", "paper", "foil", "metal", "composite"], ...),
+        ], None),
+    material_type = (Literal["plastic", "glass", "paper", "foil", "metal", "composite"], None),
     __base__=Default
 )
 
 DimensionalPackagingMetadata = create_model(
     "DimensionalPackagingMetadata",
-    dimension = Dimensions | None,
-    volume = Volume | None,
+    dimension = Dimensions | None = None,
+    volume = Volume | None = None,
     __base__=PackagingMetadata
 )
 
