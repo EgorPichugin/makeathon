@@ -1,6 +1,8 @@
 from services.assistant.functions import (
     detect_intent,
     extract_change_component_update,
+    get_route_vector,
+    get_product_structure,
     validate_change_request,
 )
 from services.assistant.prompts import (
@@ -16,7 +18,7 @@ def orchestrator_node(state: AppState) -> dict:
 
 
 def route_after_orchestrator(state: AppState) -> str:
-    intent = state["intent"]
+    intent = state["intent"] # type: ignore
     return intent.value if isinstance(intent, Intent) else intent
 
 
@@ -85,3 +87,8 @@ def ask_for_missing_node(state: AppState) -> dict:
 
 def side_question_node(state: AppState) -> dict:
     return {"final_answer": SIDE_QUESTION_RESPONSE}
+
+
+def create_component_structure_node(state: AppState) -> dict:
+    route = get_route_vector(state)
+    return get_product_structure(route)

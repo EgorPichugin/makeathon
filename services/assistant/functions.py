@@ -1,15 +1,24 @@
 import sqlite3
 from pathlib import Path
 
+from schemas.component import (
+    ConsumableIngredientMetadata,
+    DimensionalNonConsumableIngredientMetadata,
+    DimensionalPackagingMetadata,
+    NonConsumableIngredientMetadata,
+    NonDimensionalPackagingMetadata,
+)
 from services.assistant.llm import get_structured_llm
 from services.assistant.models import (
     ChangeComponentUpdateResult,
     ConversationIntentResult,
+    NavigationComponentTreeResult,
 )
 from services.assistant.observability import invoke_with_logging
 from services.assistant.prompts import (
     CHANGE_COMPONENT_UPDATE_PROMPT,
     INTENT_ROUTER_PROMPT,
+    NAVIGATE_COMPONENT_TREE_REQUEST,
 )
 from services.assistant.state import AppState, Intent
 
@@ -179,3 +188,30 @@ def _supplier_supplies_product(connection: sqlite3.Connection, supplier_id: int,
         (supplier_id, product_id),
     ).fetchone()
     return row is not None
+
+def get_route_vector(state: AppState) -> list[int]:
+    component_structure_prompt = NAVIGATE_COMPONENT_TREE_REQUEST.format(
+        product_name=state.get("product_name", ""),
+        component_name=state.get("component_name", ""),
+        supplier_name=state.get("supplier_name", ""),
+    )
+
+    result: NavigationComponentTreeResult = invoke_with_logging(
+        "navigate_component_tree_llm",
+        get_structured_llm(NavigationComponentTreeResult),
+        component_structure_prompt,
+    )
+    return result.route_vector
+
+def get_product_structure(route_vector: list[int]) -> str | None:
+    if route_vector == [0, 0, 0]:
+        return ConsumableIngredientMetadata().model_dump_json()
+    elif route_vector == [0, 1, 0]:
+        return NonConsumableIngredientMetadata().model_dump_json()
+    elif route_vector == [0, 1, 1]:
+        return DimensionalNonConsumableIngredientMetadata().model_dump_json()
+    elif route_vector == [1, 0, 0]:
+        return NonDimensionalPackagingMetadata().model_dump_json()
+    elif route_vector == [1, 1, 0]:
+        return DimensionalPackagingMetadata().model_dump_json()
+    return None
