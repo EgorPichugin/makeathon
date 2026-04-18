@@ -78,7 +78,7 @@ def validator_node(state: AppState) -> dict:
 def suppliers_search_node(state: AppState) -> dict[str, list[str]]:
     supplier_components: dict[str, list[str]] = get_supplier_components_for_product(state["product_name"])
     
-    filtered_supplier_components = filter_products_by_route_vector(supplier_components, state['route_vector'])
+    filtered_supplier_components = filter_products_by_route_vector(supplier_components, state["route_vector"])
     return {
         "final_answer": json.dumps(filtered_supplier_components, indent=2)
     }
