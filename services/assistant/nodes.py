@@ -1,6 +1,9 @@
+import json
+
 from services.assistant.functions import (
     detect_intent,
     extract_change_component_update,
+    get_supplier_components_for_product,
     validate_change_request,
 )
 from services.assistant.prompts import (
@@ -66,12 +69,15 @@ def validator_node(state: AppState) -> dict:
 
     return {
         "validation_errors": [],
-        "missing_fields": [],
-        "final_answer": (
-            f"{CHANGE_COMPONENT_RESPONSE} "
-            f"I verified that product '{state['product_name']}', component '{state['component_name']}', "
-            f"and supplier '{state['supplier_name']}' exist in the database."
-        ),
+        "missing_fields": []
+    }
+
+def suppliers_search_node(state: AppState) -> dict[str, list[str]]:
+    supplier_components: dict[str, list[str]] = get_supplier_components_for_product(state["product_name"])
+    
+    # Here should be Tykhin logic to filter only components which are related to the same component category.
+    return {
+        "final_answer": json.dumps(supplier_components, indent=2)
     }
 
 

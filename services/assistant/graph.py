@@ -7,6 +7,7 @@ from services.assistant.nodes import (
     route_after_change_component,
     route_after_orchestrator,
     side_question_node,
+    suppliers_search_node,
     validator_node,
 )
 from services.assistant.observability import logged_node
@@ -32,6 +33,9 @@ def build_orchestrator_graph():
 
     # Validate the change component request against the database and provide a final answer
     graph.add_node("validator", logged_node("validator", validator_node))
+
+    # Search for similar components in a list of product suppliers
+    graph.add_node("suppliers_search", logged_node("suppliers_search", suppliers_search_node))
     #endregion
 
     graph.add_edge(START, "orchestrator")
@@ -53,7 +57,8 @@ def build_orchestrator_graph():
     )
     graph.add_edge("ask_for_missing", END)
     graph.add_edge("side_question", END)
-    graph.add_edge("validator", END)
+    graph.add_edge("validator", "suppliers_search")
+    graph.add_edge("suppliers_search", END)
 
     return graph.compile()
 

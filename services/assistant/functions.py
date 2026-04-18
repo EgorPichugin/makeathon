@@ -10,6 +10,7 @@ from services.assistant.prompts import (
 )
 from services.assistant.state import AppState, Intent
 from services.assistant.validation import validate_change_request_data
+from services.db import get_connection
 
 
 def detect_intent(state: AppState) -> Intent:
@@ -85,3 +86,51 @@ def validate_change_request(state: AppState) -> dict:
         component_name=state["component_name"],
         supplier_name=state["supplier_name"],
     )
+
+
+def get_product_suppliers(product_id: int) -> list[str]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT s.Name
+            FROM Supplier_Product sp
+            JOIN Supplier s ON s.Id = sp.SupplierId
+            WHERE sp.ProductId = %s
+            AND s.Name IS NOT NULL
+            AND TRIM(s.Name) != ''
+            ORDER BY s.Name
+            """,
+            (product_id,),
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
+def get_supplier_components_for_product(product_name: str) -> dict[str, list[str]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT s.Name, component.SKU
+            FROM Product finished_product
+            JOIN BOM b ON b.ProducedProductId = finished_product.Id
+            JOIN BOM_Component bc ON bc.BOMId = b.Id
+            JOIN Product component ON component.Id = bc.ConsumedProductId
+            JOIN Supplier_Product sp ON sp.ProductId = bc.ConsumedProductId
+            JOIN Supplier s ON s.Id = sp.SupplierId
+            WHERE LOWER(finished_product.SKU) = LOWER(%s)
+            AND s.Name IS NOT NULL
+            AND TRIM(s.Name) != ''
+            AND component.SKU IS NOT NULL
+            AND TRIM(component.SKU) != ''
+            ORDER BY s.Name, component.SKU
+            """,
+            (product_name.strip(),),
+        ).fetchall()
+
+    supplier_components: dict[str, list[str]] = {}
+    for supplier_name, component_sku in rows:
+        if supplier_name not in supplier_components:
+            supplier_components[supplier_name] = []
+        if component_sku not in supplier_components[supplier_name]:
+            supplier_components[supplier_name].append(component_sku)
+
+    return supplier_components
