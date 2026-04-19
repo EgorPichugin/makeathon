@@ -25,7 +25,9 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-2.5-flash"
-MAX_PARALLEL_COMPANIES = 2
+# Companies are processed sequentially (see find_product_info) to stay under Vertex AI
+# per-minute quotas; parallel was causing 429s. Per-company HTTP calls (URL resolve /
+# page fetch) are still parallelized internally — those aren't Gemini calls.
 URL_RESOLVE_TIMEOUT = 10.0
 PAGE_FETCH_TIMEOUT = 15.0
 MAX_URLS_PER_COMPANY = 3
@@ -528,25 +530,25 @@ def _init_run_ctx(query: ProductQuery) -> dict | None:
 def find_product_info(query: ProductQuery) -> FilledProductMatrix:
     """Fill a raw-material spec matrix (companies × characteristics).
 
-    Pipeline per company (run in parallel, capped at MAX_PARALLEL_COMPANIES):
+    Pipeline per company (processed SEQUENTIALLY to stay under Vertex AI per-minute quota):
       1. Grounded Gemini call discovers up to N product-page URLs.
       2. httpx + BeautifulSoup fetch full HTML content of each URL.
       3. Non-grounded Gemini call extracts specs from the fetched text via response_schema.
 
-    If DATABASE_URL is set, each run is persisted to Postgres (result_tables + runs + dynamic JSONB table).
+    Parallelism inside a single company (URL resolve, page fetching) is kept — those are plain
+    HTTP calls and do not count against Vertex quotas.
+
+    If SPEC_LOG_DATABASE_URL is set, each run is persisted to Postgres
+    (result_tables + runs + dynamic JSONB table).
     """
     client = _make_client()
     chars_list = _build_characteristics_list(query)
     run_ctx = _init_run_ctx(query)
 
-    workers = min(MAX_PARALLEL_COMPANIES, max(1, len(query.companies)))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(
-            pool.map(
-                lambda c: _fill_for_company(client, query, c, chars_list, run_ctx),
-                query.companies,
-            )
-        )
+    # Sequential: one company at a time, so we never overlap two Gemini pipelines.
+    results: list[tuple[CompanyProductSpec, int, int]] = []
+    for company in query.companies:
+        results.append(_fill_for_company(client, query, company, chars_list, run_ctx))
 
     specs = [r[0] for r in results]
     total_in = sum(r[1] for r in results)
