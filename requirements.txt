@@ -4,3 +4,11 @@ langchain-openai
 langgraph
 psycopg[binary]
 uvicorn[standard]
+# spec_filler / spec_ranker integration (Gemini-based supplier comparison agents)
+google-genai>=0.3.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+httpx>=0.27.0
+beautifulsoup4>=4.12.0
+tenacity>=8.2.0
+psycopg2-binary>=2.9.0

@@ -17,3 +17,9 @@ class AppState(TypedDict, total=False):
     missing_fields: list[str]
     validation_errors: list[str]
     final_answer: str
+    # Populated by suppliers_search_node, consumed by fill_specs_node.
+    filtered_suppliers: dict[str, list[str]] | None
+    # Populated by fill_specs_node (spec_filler output as a dict), consumed by rank_suppliers_node.
+    spec_matrix: dict | None
+    # Populated by rank_suppliers_node (spec_ranker output as a dict).
+    ranking_result: dict | None

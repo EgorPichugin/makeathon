@@ -192,8 +192,106 @@ def get_filtered_products_by_route_vector(products: dict[str, list[str]], route_
     for supplier, product_names in products.items():
         for product in product_names:
             product_vector = get_route_vector_for_product(supplier, product)
-            if product_vector == route_vector: 
+            if product_vector == route_vector:
                 if supplier not in filtered:
                     filtered[supplier] = []
                 filtered[supplier].append(product)
     return filtered
+
+
+# ---------------------------------------------------------------------------
+# spec_filler / spec_ranker integration helpers
+# ---------------------------------------------------------------------------
+
+from services.spec_filler import ProductQuery, find_product_info
+from services.spec_ranker import rank_suppliers
+
+
+def list_characteristics_for_route(route_vector: list[int]) -> list[str]:
+    """Return the Pydantic field names of the metadata schema chosen by the route vector.
+
+    These are the characteristics our spec_filler agent will try to fill from the web for
+    each supplier. If the route vector doesn't match any known schema, returns an empty list.
+    """
+    structure = get_product_structure(route_vector)
+    if structure is None:
+        return []
+    return list(structure.keys())
+
+
+def build_candidate_company_list(
+    current_supplier: str,
+    filtered_suppliers: dict[str, list[str]],
+) -> list[str]:
+    """Order companies so that the CURRENT (to-be-replaced) supplier is first (reference),
+    followed by candidate alternatives. Duplicates removed.
+    """
+    ordered: list[str] = [current_supplier]
+    for supplier in filtered_suppliers:
+        if supplier and supplier != current_supplier and supplier not in ordered:
+            ordered.append(supplier)
+    return ordered
+
+
+def fill_component_specs(
+    component_name: str,
+    characteristics: list[str],
+    companies: list[str],
+) -> dict:
+    """Run spec_filler to fill characteristics for each company. Returns the matrix as a plain dict
+    so it can travel through LangGraph state (TypedDict) without custom serializers.
+    """
+    query = ProductQuery(
+        raw_material_name=component_name,
+        characteristics=characteristics,
+        companies=companies,
+    )
+    matrix = find_product_info(query)
+    return matrix.model_dump()
+
+
+def rank_component_suppliers(matrix_dict: dict) -> dict:
+    """Run spec_ranker on the filled matrix dict. Returns the ranking result as a plain dict."""
+    # Import here to keep the module-level import surface small.
+    from services.spec_filler.product_spec import FilledProductMatrix
+
+    matrix = FilledProductMatrix.model_validate(matrix_dict)
+    result = rank_suppliers(matrix)
+    return result.model_dump()
+
+
+def format_ranking_answer(ranking_dict: dict) -> str:
+    """Turn a ranking dict into a readable markdown-ish string for the chat final_answer."""
+    lines: list[str] = []
+    lines.append(f"**Raw material:** {ranking_dict['raw_material_name']}")
+    ref = ranking_dict["reference"]
+    lines.append(
+        f"**Reference supplier (current):** {ref['company']} — "
+        f"{ref['found_characteristics']}/{ref['total_characteristics']} characteristics filled"
+    )
+
+    rankings = ranking_dict.get("rankings", [])
+    if rankings:
+        lines.append("")
+        lines.append("**Ranked alternatives (best first):**")
+        for r in rankings:
+            lines.append(
+                f"  {r['rank']}. {r['company']} — overall={r['overall_score']:.2f}  "
+                f"coverage={r['coverage']:.2f}  fit={r['fit_score']:.2f}  [{r['verdict']}]"
+            )
+    else:
+        lines.append("")
+        lines.append("_No alternative suppliers were ranked._")
+
+    excluded = ranking_dict.get("excluded", [])
+    if excluded:
+        lines.append("")
+        lines.append("**Excluded:**")
+        for e in excluded:
+            lines.append(f"  - {e['company']} — {e['verdict']} ({e['reason']})")
+
+    cost = ranking_dict.get("cost_usd")
+    if cost is not None:
+        lines.append("")
+        lines.append(f"_Scorer cost: ${cost:.4f}_")
+    return "\n".join(lines)
