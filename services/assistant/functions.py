@@ -260,38 +260,118 @@ def rank_component_suppliers(matrix_dict: dict) -> dict:
     return result.model_dump()
 
 
-def format_ranking_answer(ranking_dict: dict) -> str:
-    """Turn a ranking dict into a readable markdown-ish string for the chat final_answer."""
-    lines: list[str] = []
-    lines.append(f"**Raw material:** {ranking_dict['raw_material_name']}")
-    ref = ranking_dict["reference"]
-    lines.append(
-        f"**Reference supplier (current):** {ref['company']} — "
-        f"{ref['found_characteristics']}/{ref['total_characteristics']} characteristics filled"
-    )
+def _reference_cells_from_ranking(ranking_dict: dict) -> list[dict]:
+    """Pull the reference-side cell list from the first ranking/excluded entry.
 
-    rankings = ranking_dict.get("rankings", [])
+    The ranker uses the same set of characteristics (those where the reference has data) for
+    every candidate, so any entry's `cells` list gives us the reference picture.
+    """
+    for entry in ranking_dict.get("rankings", []) + ranking_dict.get("excluded", []):
+        if entry.get("cells"):
+            return entry["cells"]
+    return []
+
+
+def format_ranking_answer(ranking_dict: dict) -> str:
+    """Render a ranking result as a readable markdown message for the chat UI."""
+    raw_material = ranking_dict.get("raw_material_name", "(unknown)")
+    ref = ranking_dict.get("reference", {}) or {}
+    rankings = ranking_dict.get("rankings", []) or []
+    excluded = ranking_dict.get("excluded", []) or []
+
+    best_score = max((r.get("overall_score", 0.0) for r in rankings), default=0.0)
+    # Classify outcome for the headline: user-facing language, no scores here.
+    if best_score >= 0.5:
+        headline = (
+            f"## Found {sum(1 for r in rankings if r.get('overall_score', 0) >= 0.5)} "
+            f"viable replacement(s) for `{raw_material}`"
+        )
+    elif best_score >= 0.25:
+        headline = (
+            f"## No strong replacement for `{raw_material}` — "
+            f"{len(rankings)} partial match(es) found"
+        )
+    else:
+        headline = f"## No suitable replacement found for `{raw_material}`"
+
+    lines: list[str] = [headline, ""]
+
+    # Current supplier summary
+    lines.append(
+        f"**Current supplier:** {ref.get('company', '?')} — "
+        f"{ref.get('found_characteristics', 0)}/{ref.get('total_characteristics', 0)} "
+        f"characteristics publicly documented"
+    )
+    ref_cells = _reference_cells_from_ranking(ranking_dict)
+    if ref_cells:
+        for c in ref_cells:
+            val = c.get("reference_value") or "?"
+            src = c.get("reference_source") or ""
+            link = f" ([source]({src}))" if src else ""
+            lines.append(f"- {c.get('characteristic', '?')}: `{val}`{link}")
+
+    # Ranked alternatives (even Poor match: user asked to list all)
     if rankings:
         lines.append("")
-        lines.append("**Ranked alternatives (best first):**")
+        lines.append(f"### Alternatives ranked ({len(rankings)})")
         for r in rankings:
-            lines.append(
-                f"  {r['rank']}. {r['company']} — overall={r['overall_score']:.2f}  "
-                f"coverage={r['coverage']:.2f}  fit={r['fit_score']:.2f}  [{r['verdict']}]"
-            )
-    else:
-        lines.append("")
-        lines.append("_No alternative suppliers were ranked._")
+            cells = r.get("cells", []) or []
+            matches = [c for c in cells if c.get("match") == 1 and c.get("trust") == 1]
+            issues = [
+                c for c in cells
+                if c.get("candidate_value") is not None
+                and (c.get("match") == 0 or c.get("trust") == 0)
+            ]
+            missing = [c for c in cells if c.get("candidate_value") is None]
 
-    excluded = ranking_dict.get("excluded", [])
+            lines.append("")
+            lines.append(
+                f"**#{r.get('rank', '?')}. {r.get('company', '?')}** — "
+                f"{r.get('verdict', '?')} "
+                f"(score {r.get('overall_score', 0):.2f}, "
+                f"coverage {r.get('coverage', 0):.0%}, "
+                f"fit {r.get('fit_score', 0):.0%})"
+            )
+            if matches:
+                lines.append("  **What matches:**")
+                for c in matches:
+                    why = c.get("rationale") or ""
+                    val = c.get("candidate_value") or "?"
+                    lines.append(
+                        f"    - {c.get('characteristic', '?')}: `{val}`"
+                        + (f" — {why}" if why else "")
+                    )
+            if issues:
+                lines.append("  **Differences or low-trust sources:**")
+                for c in issues:
+                    why = c.get("rationale") or ""
+                    ref_val = c.get("reference_value") or "?"
+                    cand_val = c.get("candidate_value") or "?"
+                    lines.append(
+                        f"    - {c.get('characteristic', '?')}: candidate `{cand_val}` "
+                        f"vs reference `{ref_val}`"
+                        + (f" — {why}" if why else "")
+                    )
+            if missing:
+                names = ", ".join(c.get("characteristic", "?") for c in missing)
+                lines.append(f"  **Missing on their page:** {names}")
+
+    # Excluded (hard filter or insufficient data)
     if excluded:
         lines.append("")
-        lines.append("**Excluded:**")
+        lines.append(f"### Not suitable ({len(excluded)})")
         for e in excluded:
-            lines.append(f"  - {e['company']} — {e['verdict']} ({e['reason']})")
+            lines.append(
+                f"- **{e.get('company', '?')}** — {e.get('verdict', '?')}: "
+                f"{e.get('reason', '')}"
+            )
+
+    if not rankings and not excluded:
+        lines.append("")
+        lines.append("_No candidate suppliers were evaluated._")
 
     cost = ranking_dict.get("cost_usd")
     if cost is not None:
         lines.append("")
-        lines.append(f"_Scorer cost: ${cost:.4f}_")
+        lines.append(f"_Ranking cost: ${cost:.4f}_")
     return "\n".join(lines)
