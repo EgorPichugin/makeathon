@@ -3,7 +3,9 @@ from langgraph.graph import END, START, StateGraph
 from services.assistant.nodes import (
     ask_for_missing_node,
     change_component_node,
+    fill_specs_node,
     orchestrator_node,
+    rank_suppliers_node,
     route_after_change_component,
     route_after_orchestrator,
     side_question_node,
@@ -42,6 +44,12 @@ def build_orchestrator_graph():
     # Search for similar components in a list of product suppliers
     graph.add_node("suppliers_search", logged_node("suppliers_search", suppliers_search_node))
 
+    # Fill technical specifications for each supplier (via spec_filler agent)
+    graph.add_node("fill_specs", logged_node("fill_specs", fill_specs_node))
+
+    # Rank alternative suppliers against the current one (via spec_ranker agent)
+    graph.add_node("rank_suppliers", logged_node("rank_suppliers", rank_suppliers_node))
+
     #endregion
 
     graph.add_edge(START, "orchestrator")
@@ -66,7 +74,9 @@ def build_orchestrator_graph():
     graph.add_edge("side_question", END)
     graph.add_edge("validator", "create_component_structure")
     graph.add_edge("create_component_structure", "suppliers_search")
-    graph.add_edge("suppliers_search", END)
+    graph.add_edge("suppliers_search", "fill_specs")
+    graph.add_edge("fill_specs", "rank_suppliers")
+    graph.add_edge("rank_suppliers", END)
 
     return graph.compile()
 
